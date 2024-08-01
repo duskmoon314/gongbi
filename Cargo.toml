@@ -1,0 +1,9 @@
+[package]
+name = "gongbi"
+version = "0.1.0"
+edition = "2021"
+authors = ["duskmoon (Campbell He) <kp.campbell.he@duskmoon314.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/duskmoon314/gongbi"
+
+[dependencies]
