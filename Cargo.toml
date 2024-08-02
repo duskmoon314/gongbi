@@ -2,8 +2,19 @@
 name = "gongbi"
 version = "0.1.0"
 edition = "2021"
+description = "A data visualization crate based on plotters"
 authors = ["duskmoon (Campbell He) <kp.campbell.he@duskmoon314.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/duskmoon314/gongbi"
 
 [dependencies]
+anyhow = "1.0.86"
+derive_more = "0.99.18"
+num-traits = "0.2.19"
+plotters = "0.3.6"
+polars = { version = "0.41.3", features = ["csv"] }
+thiserror = "1.0.63"
+typed-builder = "0.19.1"
+
+[dev-dependencies]
+trybuild = "1.0.99"
