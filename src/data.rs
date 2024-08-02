@@ -1,5 +1,6 @@
 use ::polars::prelude as pl;
 use num_traits::NumCast;
+use plotters::style::{Palette, ShapeStyle};
 
 pub mod polars;
 
@@ -20,10 +21,18 @@ impl Data {
             Data::Polars(df) => df.column_range(column),
         }
     }
+
+    pub fn column_to_color<P: Palette>(&self, column: &str, palette: &P) -> Vec<ShapeStyle> {
+        match self {
+            Data::Polars(df) => df.column_to_color(column, palette),
+        }
+    }
 }
 
 pub trait DataMethod {
     fn column<T: NumCast>(&self, column: &str) -> Vec<T>;
 
     fn column_range<T: NumCast>(&self, column: &str) -> (T, T);
+
+    fn column_to_color<P: Palette>(&self, column: &str, palette: &P) -> Vec<ShapeStyle>;
 }

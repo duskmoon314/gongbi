@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+pub use plotters;
+
 use geom::GeomMethod;
 
 pub mod aes;
@@ -71,6 +73,8 @@ impl Plot {
                 for geom in &self.geoms {
                     geom.draw(&root, self.data.as_ref().unwrap())?;
                 }
+
+                root.present()?;
             }
             "svg" => {
                 let root =
@@ -81,6 +85,8 @@ impl Plot {
                 for geom in &self.geoms {
                     geom.draw(&root, self.data.as_ref().unwrap())?;
                 }
+
+                root.present()?;
             }
             _ => panic!("Unsupported file extension"),
         }

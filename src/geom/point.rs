@@ -1,4 +1,6 @@
-use plotters::{coord::Shift, prelude::*};
+use plotters::{coord::Shift, prelude::*, style::Color};
+
+use crate::aes::plaette::Pastel1;
 
 use super::GeomMethod;
 
@@ -44,16 +46,37 @@ impl GeomMethod for GeomPoint {
         let mut chart = ChartBuilder::on(area)
             .x_label_area_size(40)
             .y_label_area_size(40)
+            .margin((1).percent())
             .build_cartesian_2d(x_range.0..x_range.1, y_range.0..y_range.1)?;
 
+        chart.draw_series([Rectangle::new(
+            [(x_range.0, y_range.0), (x_range.1, y_range.1)],
+            BLACK.mix(0.2).filled(),
+        )])?;
+
         let mut mesh = chart.configure_mesh();
-        mesh.x_desc(x).y_desc(y);
+        mesh.x_desc(x)
+            .y_desc(y)
+            .light_line_style(TRANSPARENT)
+            .x_labels(x_range.1 as usize - x_range.0 as usize)
+            .y_labels(y_range.1 as usize - y_range.0 as usize);
 
         mesh.draw()?;
 
         let points: Vec<(f64, f64)> = data.column(x).into_iter().zip(data.column(y)).collect();
 
-        chart.draw_series(points.iter().map(|(x, y)| Circle::new((*x, *y), 3, BLACK)))?;
+        let color = match &aes.color {
+            Some(crate::aes::color::Color::Column(c)) => data.column_to_color(c, &Pastel1),
+            Some(crate::aes::color::Color::Rgb(rgb)) => vec![rgb.filled(); points.len()],
+            None => vec![BLACK.filled(); points.len()],
+        };
+
+        chart.draw_series(
+            points
+                .iter()
+                .zip(color)
+                .map(|((x, y), style)| Circle::new((*x, *y), aes.size.unwrap_or(5), style)),
+        )?;
 
         Ok(())
     }

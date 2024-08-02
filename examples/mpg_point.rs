@@ -7,7 +7,11 @@ fn main() -> anyhow::Result<()> {
         .try_into_reader_with_file_path(Some("examples/mpg.csv".into()))?
         .finish()?;
 
-    let plot = plot!(mpg, aes!("displ", "hwy"), save = "gongbi.svg") + geom_point!();
+    let plot = plot!(
+        mpg,
+        aes!("displ", "hwy", color = "class"),
+        save = "gongbi.svg"
+    ) + geom_point!();
 
     plot.draw()?;
 

@@ -1,4 +1,9 @@
+use std::collections::HashMap;
+
 use ::polars::prelude as pl;
+use plotters::style::{Color, Palette};
+
+use crate::aes::plaette::PaletteExt;
 
 use super::*;
 
@@ -27,5 +32,26 @@ impl DataMethod for pl::DataFrame {
             .unwrap_or_else(|| panic!("Column is empty"));
 
         (min, max)
+    }
+
+    fn column_to_color<P: Palette>(&self, column: &str, palette: &P) -> Vec<ShapeStyle> {
+        let series = self
+            .column(column)
+            .unwrap_or_else(|e| panic!("Column {column} not found: {e}"));
+
+        let mut map = HashMap::new();
+        let mut i = 0;
+
+        series
+            .iter()
+            .map(|val| {
+                let idx = map.entry(val).or_insert_with(|| {
+                    let color = palette.idx2color(i);
+                    i += 1;
+                    color.filled()
+                });
+                *idx
+            })
+            .collect()
     }
 }
