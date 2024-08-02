@@ -51,13 +51,9 @@ impl GeomMethod for GeomPoint {
 
         mesh.draw()?;
 
-        let points: Vec<(f64, f64)> = data
-            .column(x)
-            .into_iter()
-            .zip(data.column(y).into_iter())
-            .collect();
+        let points: Vec<(f64, f64)> = data.column(x).into_iter().zip(data.column(y)).collect();
 
-        chart.draw_series(points.iter().map(|(x, y)| Circle::new((*x, *y), 3, &BLACK)))?;
+        chart.draw_series(points.iter().map(|(x, y)| Circle::new((*x, *y), 3, BLACK)))?;
 
         Ok(())
     }
