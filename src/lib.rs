@@ -1,58 +1,69 @@
+// use std::path::PathBuf;
+
 use std::path::PathBuf;
 
+use layer::MappedElements;
+/// Re-export plotters crate
 pub use plotters;
-
-use geom::GeomMethod;
+use plotters::prelude::*;
 
 pub mod aes;
 pub mod data;
 pub mod geom;
+pub mod layer;
 
-#[derive(Default, typed_builder::TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+#[derive(Debug, Default, typed_builder::TypedBuilder)]
+#[builder(field_defaults(default, setter(into)))]
 pub struct Plot {
-    pub data: Option<data::Data>,
+    #[builder(setter(transform = |x: impl Into<data::Data>| Some(Box::new(x.into()))))]
+    pub data: Option<Box<data::Data>>,
 
-    pub aes: Option<aes::Aes>,
+    pub mapping: aes::Aes,
 
+    pub layers: Vec<layer::Layer>,
+
+    #[builder(setter(strip_option))]
     pub size: Option<(u32, u32)>,
 
-    #[builder(setter(!strip_option))]
-    pub geoms: Vec<geom::Geom>,
-
+    #[builder(setter(strip_option))]
     pub save: Option<PathBuf>,
 }
 
 #[macro_export]
 macro_rules! plot {
-    ($data:ident, $aes:expr $(, $($arg:ident = $val:expr),+ $(,)?)?) => {
+    ($($arg:ident = $val:expr),* $(,)?) => {
         $crate::Plot::builder()
-            .data($data)
-            .aes($aes)
-            $(.$($arg($val))+)?
+            $(.$arg($val))*
             .build()
     };
 
-    ($data:ident $(, $($arg:ident = $val:expr),+ $(,)?)?) => {
-        $crate::plot!($data, $crate::aes!() $(, $($arg = $val),+)?)
+    ($data:expr $(, $($arg:ident = $val:expr),+ $(,)?)?) => {
+        $crate::plot!(data = $data $(, $($arg = $val),+)?)
     };
+
+    ($data:expr, $aes:expr $(, $($arg:ident = $val:expr),+ $(,)?)?) => {
+        $crate::plot!(data = $data, mapping = $aes $(, $($arg = $val),+)?)
+    }
 }
 
-impl<G> core::ops::Add<G> for Plot
+impl<L> core::ops::Add<L> for Plot
 where
-    G: Into<geom::Geom> + GeomMethod,
+    L: Into<layer::Layer>,
 {
     type Output = Plot;
 
-    fn add(self, rhs: G) -> Self::Output {
-        let mut rhs = rhs;
-        rhs.aes_mut()
-            .get_or_insert(self.aes.clone().unwrap_or_default());
+    fn add(self, rhs: L) -> Self::Output {
+        // println!("self.mapping: {:?}", self.mapping);
 
-        let mut geoms = self.geoms;
-        geoms.push(rhs.into());
+        let mut rhs: layer::Layer = rhs.into();
+        rhs.data_mut()
+            .get_or_insert(self.data.as_ref().unwrap().clone());
+        rhs.mapping_mut().inherit(&self.mapping);
 
-        Plot { geoms, ..self }
+        let mut layers = self.layers;
+        layers.push(rhs);
+
+        Plot { layers, ..self }
     }
 }
 
@@ -65,62 +76,110 @@ impl Plot {
 
         match ext {
             "png" => {
-                let root =
-                    BitMapBackend::new(&save, self.size.unwrap_or((1024, 768))).into_drawing_area();
+                let root = BitMapBackend::new(&save, self.size.unwrap_or((1024, 768)));
 
-                root.fill(&WHITE)?;
-
-                for geom in &self.geoms {
-                    geom.draw(&root, self.data.as_ref().unwrap())?;
-                }
-
-                root.present()?;
+                self.draw_inner(root)?;
             }
             "svg" => {
-                let root =
-                    SVGBackend::new(&save, self.size.unwrap_or((1024, 768))).into_drawing_area();
+                let root = SVGBackend::new(&save, self.size.unwrap_or((1024, 768)));
 
-                root.fill(&WHITE)?;
-
-                for geom in &self.geoms {
-                    geom.draw(&root, self.data.as_ref().unwrap())?;
-                }
-
-                root.present()?;
+                self.draw_inner(root)?;
             }
             _ => panic!("Unsupported file extension"),
         }
 
         Ok(())
     }
-}
 
-#[derive(Debug, thiserror::Error)]
-pub enum PlotError<E>
-where
-    E: std::error::Error + Send + Sync,
-{
-    #[error("Plotters error: {0}")]
-    Plotters(#[from] plotters::prelude::DrawingAreaErrorKind<E>),
-}
+    fn draw_inner<DB: DrawingBackend>(&self, db: DB) -> anyhow::Result<()>
+    where
+        <DB as plotters::prelude::DrawingBackend>::ErrorType: 'static,
+    {
+        use plotters::prelude::*;
 
-#[cfg(test)]
-mod tests {
+        let root = db.into_drawing_area();
 
-    use super::*;
+        root.fill(&WHITE)?;
 
-    #[test]
-    fn plot_macro() -> anyhow::Result<()> {
-        // let map: HashMap<String, Vec<u32>> = HashMap::new();\
-        let df = polars::df!(
-            "a" => [1, 2, 3],
-            "b" => [4, 5, 6],
-        )?;
+        let mut elements: Vec<DynElement<DB, (f64, f64)>> = Vec::new();
+        let mut x_range = (f64::INFINITY, -f64::INFINITY);
+        let mut y_range = (f64::INFINITY, -f64::INFINITY);
 
-        let plot = plot!(df);
-        assert!(plot.data.is_some());
-        assert_eq!(plot.aes, Some(aes::Aes::default()));
+        self.layers.iter().for_each(|layer| {
+            let MappedElements {
+                x_range: x,
+                y_range: y,
+                elements: element,
+            } = layer.mapping_data::<DB>();
+
+            x_range = (x_range.0.min(x.0), x_range.1.max(x.1));
+
+            y_range = (y_range.0.min(y.0), y_range.1.max(y.1));
+
+            elements.extend(element);
+        });
+
+        let x_range_len = x_range.1 - x_range.0;
+        let y_range_len = y_range.1 - y_range.0;
+
+        x_range = (
+            x_range.0 - 0.025 * x_range_len,
+            x_range.1 + 0.025 * x_range_len,
+        );
+        y_range = (
+            y_range.0 - 0.025 * y_range_len,
+            y_range.1 + 0.025 * y_range_len,
+        );
+
+        let mut chart = ChartBuilder::on(&root)
+            .margin(5)
+            .x_label_area_size(10.percent())
+            .y_label_area_size(10.percent())
+            .build_cartesian_2d(x_range.0..x_range.1, y_range.0..y_range.1)?;
+
+        chart
+            .configure_mesh()
+            .axis_desc_style(("sans-serif", 24).into_font())
+            .x_desc(self.mapping.x.as_ref().unwrap_or(&"x".to_string()))
+            .x_label_style(("sans-serif", 16).into_font())
+            .y_desc(self.mapping.y.as_ref().unwrap_or(&"y".to_string()))
+            .x_label_style(("sans-serif", 16).into_font())
+            .draw()?;
+
+        chart.draw_series(elements)?;
+
+        root.present()?;
 
         Ok(())
     }
 }
+
+// #[derive(Debug, thiserror::Error)]
+// pub enum PlotError<E>
+// where
+//     E: std::error::Error + Send + Sync,
+// {
+//     #[error("Plotters error: {0}")]
+//     Plotters(#[from] plotters::prelude::DrawingAreaErrorKind<E>),
+// }
+
+// #[cfg(test)]
+// mod tests {
+
+//     use super::*;
+
+//     #[test]
+//     fn plot_macro() -> anyhow::Result<()> {
+//         // let map: HashMap<String, Vec<u32>> = HashMap::new();\
+//         let df = polars::df!(
+//             "a" => [1, 2, 3],
+//             "b" => [4, 5, 6],
+//         )?;
+
+//         let plot = plot!(df);
+//         assert!(plot.data.is_some());
+//         assert_eq!(plot.aes, Some(aes::Aes::default()));
+
+//         Ok(())
+//     }
+// }

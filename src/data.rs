@@ -1,38 +1,45 @@
-use ::polars::prelude as pl;
-use num_traits::NumCast;
-use plotters::style::{Palette, ShapeStyle};
+use std::fmt::Debug;
 
 pub mod polars;
 
-#[derive(Clone, Debug, derive_more::From)]
+#[derive(Clone, Debug, PartialEq, derive_more::From)]
 pub enum Data {
-    Polars(pl::DataFrame),
+    Polars(::polars::frame::DataFrame),
 }
 
 impl Data {
-    pub fn column<T: NumCast>(&self, column: &str) -> Vec<T> {
+    pub fn column_f64(&self, column: &str) -> Vec<f64> {
         match self {
-            Data::Polars(df) => DataMethod::column(df, column),
+            Data::Polars(df) => DataMethod::column_f64(df, column),
         }
     }
 
-    pub fn column_range<T: NumCast>(&self, column: &str) -> (T, T) {
+    pub fn column_range_f64(&self, column: &str) -> (f64, f64) {
         match self {
-            Data::Polars(df) => df.column_range(column),
+            Data::Polars(df) => DataMethod::column_range_f64(df, column),
         }
     }
 
-    pub fn column_to_color<P: Palette>(&self, column: &str, palette: &P) -> Vec<ShapeStyle> {
+    pub fn column_len(&self, column: &str) -> usize {
         match self {
-            Data::Polars(df) => df.column_to_color(column, palette),
+            Data::Polars(df) => DataMethod::column_len(df, column),
         }
     }
 }
 
 pub trait DataMethod {
-    fn column<T: NumCast>(&self, column: &str) -> Vec<T>;
+    /// Get a column as a Vec of f64
+    ///
+    /// This is used to get the coordinates of the data points
+    fn column_f64(&self, column: &str) -> Vec<f64>;
 
-    fn column_range<T: NumCast>(&self, column: &str) -> (T, T);
+    /// Get the range of a column as a tuple of f64
+    ///
+    /// This is used to set the range of the axis
+    fn column_range_f64(&self, column: &str) -> (f64, f64);
 
-    fn column_to_color<P: Palette>(&self, column: &str, palette: &P) -> Vec<ShapeStyle>;
+    /// Get the length of a column
+    ///
+    /// This is used to get the number of data points
+    fn column_len(&self, column: &str) -> usize;
 }

@@ -1,30 +1,39 @@
-use plotters::{coord::Shift, prelude::*};
+use plotters::prelude::DrawingBackend;
 
+use crate::layer::MappedElements;
+
+pub mod line;
 pub mod point;
 
-#[derive(Debug, derive_more::From)]
+#[derive(Clone, Debug, PartialEq, derive_more::From)]
+#[non_exhaustive]
 pub enum Geom {
-    Point(point::GeomPoint),
+    Point(point::Point),
+    Line(line::Line),
 }
 
 impl Geom {
-    pub fn draw<DB: DrawingBackend>(
-        &self,
-        area: &DrawingArea<DB, Shift>,
-        data: &crate::data::Data,
-    ) -> Result<(), crate::PlotError<DB::ErrorType>> {
+    pub fn data_mut(&mut self) -> &mut Option<Box<crate::data::Data>> {
         match self {
-            Geom::Point(p) => p.draw(area, data),
+            Geom::Point(p) => p.data_mut(),
+            Geom::Line(l) => l.data_mut(),
         }
     }
-}
 
-pub trait GeomMethod {
-    fn aes_mut(&mut self) -> &mut Option<crate::aes::Aes>;
+    pub fn mapping_mut(&mut self) -> &mut crate::aes::Aes {
+        match self {
+            Geom::Point(p) => p.mapping_mut(),
+            Geom::Line(l) => l.mapping_mut(),
+        }
+    }
 
-    fn draw<DB: DrawingBackend>(
-        &self,
-        area: &DrawingArea<DB, Shift>,
-        data: &crate::data::Data,
-    ) -> Result<(), crate::PlotError<DB::ErrorType>>;
+    pub fn mapping_data<'a, DB>(&self) -> MappedElements<'a, DB>
+    where
+        DB: DrawingBackend,
+    {
+        match self {
+            Geom::Point(p) => p.mapping_data(),
+            Geom::Line(l) => l.mapping_data(),
+        }
+    }
 }

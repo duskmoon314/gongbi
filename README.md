@@ -12,7 +12,7 @@ let mpg = CsvReadOptions::default()
 
 let plot = plot!(
     mpg,
-    aes!("displ", "hwy", color = "class"),
+    aes!("displ", "hwy"),
     save = "gongbi.svg"
 ) + geom_point!();
 

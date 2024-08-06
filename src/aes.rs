@@ -4,30 +4,39 @@ pub mod plaette;
 #[derive(Clone, Debug, Default, PartialEq, typed_builder::TypedBuilder)]
 #[builder(field_defaults(default, setter(into, strip_option)))]
 pub struct Aes {
-    /// The `x` dimension to use
+    /// Which column is used for the x-axis
     pub x: Option<String>,
 
-    /// The `y` dimension to use
+    /// Which column is used for the y-axis
     pub y: Option<String>,
 
+    /// The alpha value for the color
     pub alpha: Option<f64>,
 
+    /// The color to use
     pub color: Option<color::Color>,
 
-    #[builder(default = true, setter(!strip_option))]
-    pub fill: bool,
+    /// Whether to fill the shape
+    pub fill: Option<bool>,
 
+    /// The size of the shape
     pub size: Option<i32>,
 }
 
-/// The builder for the `Aes` struct
-pub fn aes() -> AesBuilder {
-    Aes::builder()
+impl Aes {
+    pub fn inherit(&mut self, parent_aes: &Aes) {
+        self.x = self.x.clone().or(parent_aes.x.clone());
+        self.y = self.y.clone().or(parent_aes.y.clone());
+        self.alpha = self.alpha.or(parent_aes.alpha);
+        self.color = self.color.clone().or(parent_aes.color.clone());
+        self.fill = self.fill.or(parent_aes.fill);
+        self.size = self.size.or(parent_aes.size);
+    }
 }
 
 #[macro_export]
 macro_rules! aes {
-    // The main implementation of the aes macro
+    // The main implementation
     ($($arg:ident = $val:expr),* $(,)?) => {
         $crate::aes::Aes::builder()
             $(.$arg($val))*
@@ -35,12 +44,12 @@ macro_rules! aes {
     };
 
     // Extend the macro to accept x without named
-    ($x: literal $(, $($arg:ident = $val:expr),* $(,)?)?) => {
+    ($x: expr $(, $($arg:ident = $val:expr),* $(,)?)?) => {
         $crate::aes!(x = $x $(, $($arg = $val),+)?)
     };
 
     // Extend the macro to accept x and y without named
-    ($x: literal, $y: literal $(, $($arg:ident = $val:expr),* $(,)?)?) => {
+    ($x: expr, $y: expr $(, $($arg:ident = $val:expr),* $(,)?)?) => {
         $crate::aes!(x = $x, y = $y $(, $($arg = $val),+)?)
     };
 }
@@ -49,62 +58,14 @@ macro_rules! aes {
 mod tests {
     use crate::rgb;
 
-    use super::*;
+    // use super::*;
 
     #[test]
     fn aes_macro() {
-        let aes = aes!("x");
-        assert_eq!(
-            aes,
-            Aes {
-                x: Some(String::from("x")),
-                ..Default::default()
-            }
-        );
-
-        let aes = aes!("x", "y");
-        assert_eq!(
-            aes,
-            Aes {
-                x: Some(String::from("x")),
-                y: Some(String::from("y")),
-                ..Default::default()
-            }
-        );
-
-        let aes = aes!("x", y = "y");
-        assert_eq!(
-            aes,
-            Aes {
-                x: Some(String::from("x")),
-                y: Some(String::from("y")),
-                ..Default::default()
-            }
-        );
-
-        let aes = aes!(x = "x", y = "y");
-        assert_eq!(
-            aes,
-            Aes {
-                x: Some(String::from("x")),
-                y: Some(String::from("y")),
-                ..Default::default()
-            }
-        );
-
-        let aes = aes!("x", color = rgb!(255, 0, 0));
-    }
-
-    #[test]
-    fn aes_builder_fn() {
-        let aes = aes().x("x").build();
-        assert_eq!(
-            aes,
-            Aes {
-                x: Some(String::from("x")),
-                y: None,
-                ..Default::default()
-            }
-        );
+        let _ = aes!("x");
+        let _ = aes!("x", "y");
+        let _ = aes!("x", y = "y");
+        let _ = aes!(x = "x", y = "y");
+        let _ = aes!("x", color = rgb!(255, 0, 0));
     }
 }

@@ -1,38 +1,43 @@
-use plotters::style::RGBColor;
+use plotters::style::{RGBAColor, RGBColor};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Color {
     Column(String),
-    Rgb(RGBColor),
+    Rgba(RGBAColor),
 }
 
-impl From<&str> for Color {
-    fn from(value: &str) -> Self {
-        Color::Column(value.to_string())
+impl From<String> for Color {
+    fn from(value: String) -> Self {
+        Color::Column(value)
+    }
+}
+
+impl From<RGBAColor> for Color {
+    fn from(value: RGBAColor) -> Self {
+        Color::Rgba(value)
     }
 }
 
 impl From<RGBColor> for Color {
     fn from(value: RGBColor) -> Self {
-        Color::Rgb(value)
+        Color::Rgba(value.into())
     }
-}
-
-pub fn str_to_rgb(value: &str) -> RGBColor {
-    let value = value.trim_start_matches('#');
-    let r = u8::from_str_radix(&value[0..2], 16).unwrap();
-    let g = u8::from_str_radix(&value[2..4], 16).unwrap();
-    let b = u8::from_str_radix(&value[4..6], 16).unwrap();
-    RGBColor(r, g, b)
 }
 
 #[macro_export]
 macro_rules! rgb {
     ($r: expr, $g: expr, $b: expr) => {
-        $crate::aes::color::Color::Rgb($crate::plotters::prelude::RGBColor($r, $g, $b))
+        $crate::aes::color::Color::Rgba($crate::plotters::style::RGBColor($r, $g, $b).into())
     };
+}
 
-    ($str: literal) => {
-        Color::Rgb(str_to_rgb($str))
-    };
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rgb_macro() {
+        let color = rgb!(0, 0, 0);
+        assert_eq!(color, Color::Rgba(RGBAColor(0, 0, 0, 1.0)));
+    }
 }
