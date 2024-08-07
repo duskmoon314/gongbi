@@ -10,11 +10,9 @@ let mpg = CsvReadOptions::default()
     .try_into_reader_with_file_path(Some("examples/mpg.csv".into()))?
     .finish()?;
 
-let plot = plot!(
-    mpg,
-    aes!("displ", "hwy"),
-    save = "gongbi.svg"
-) + geom_point!();
+let plot = plot!(mpg, aes!("displ", "hwy"), save = "gongbi.svg")
+    + geom_point!()
+    + labs!(caption = "Demo of geom_point");
 
 plot.draw()?;
 ```

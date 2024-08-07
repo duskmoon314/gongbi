@@ -10,6 +10,7 @@ use plotters::prelude::*;
 pub mod aes;
 pub mod data;
 pub mod geom;
+pub mod label;
 pub mod layer;
 
 #[derive(Debug, Default, typed_builder::TypedBuilder)]
@@ -21,6 +22,8 @@ pub struct Plot {
     pub mapping: aes::Aes,
 
     pub layers: Vec<layer::Layer>,
+
+    pub label: label::Label,
 
     #[builder(setter(strip_option))]
     pub size: Option<(u32, u32)>,
@@ -64,6 +67,16 @@ where
         layers.push(rhs);
 
         Plot { layers, ..self }
+    }
+}
+
+impl core::ops::Add<label::Label> for Plot {
+    type Output = Plot;
+
+    fn add(self, rhs: label::Label) -> Self::Output {
+        let label = self.label + rhs;
+
+        Plot { label, ..self }
     }
 }
 
@@ -131,20 +144,41 @@ impl Plot {
             y_range.1 + 0.025 * y_range_len,
         );
 
-        let mut chart = ChartBuilder::on(&root)
-            .margin(5)
-            .x_label_area_size(10.percent())
-            .y_label_area_size(10.percent())
-            .build_cartesian_2d(x_range.0..x_range.1, y_range.0..y_range.1)?;
+        let mut chart = ChartBuilder::on(&root);
 
         chart
-            .configure_mesh()
-            .axis_desc_style(("sans-serif", 24).into_font())
-            .x_desc(self.mapping.x.as_ref().unwrap_or(&"x".to_string()))
+            .margin(5)
+            .x_label_area_size(10.percent())
+            .y_label_area_size(10.percent());
+
+        if let Some(caption) = self.label.caption.as_ref() {
+            chart.caption(caption, ("sans-serif", 32).into_font());
+        }
+
+        let mut chart = chart.build_cartesian_2d(x_range.0..x_range.1, y_range.0..y_range.1)?;
+
+        let mut mesh = chart.configure_mesh();
+        mesh.axis_desc_style(("sans-serif", 24).into_font())
             .x_label_style(("sans-serif", 16).into_font())
-            .y_desc(self.mapping.y.as_ref().unwrap_or(&"y".to_string()))
-            .x_label_style(("sans-serif", 16).into_font())
-            .draw()?;
+            .y_label_style(("sans-serif", 16).into_font());
+
+        if let Some(x_label) = self.label.x.as_ref() {
+            mesh.x_desc(x_label);
+        } else if let Some(x_label) = self.mapping.x.as_ref() {
+            mesh.x_desc(x_label);
+        } else {
+            mesh.x_desc("x");
+        }
+
+        if let Some(y_label) = self.label.y.as_ref() {
+            mesh.y_desc(y_label);
+        } else if let Some(y_label) = self.mapping.y.as_ref() {
+            mesh.y_desc(y_label);
+        } else {
+            mesh.y_desc("y");
+        }
+
+        mesh.draw()?;
 
         chart.draw_series(elements)?;
 
