@@ -1,8 +1,9 @@
-// use std::path::PathBuf;
+// #![deny(missing_docs)]
 
 use std::path::PathBuf;
 
 use layer::MappedElements;
+
 /// Re-export plotters crate
 pub use plotters;
 use plotters::prelude::*;
@@ -187,33 +188,3 @@ impl Plot {
         Ok(())
     }
 }
-
-// #[derive(Debug, thiserror::Error)]
-// pub enum PlotError<E>
-// where
-//     E: std::error::Error + Send + Sync,
-// {
-//     #[error("Plotters error: {0}")]
-//     Plotters(#[from] plotters::prelude::DrawingAreaErrorKind<E>),
-// }
-
-// #[cfg(test)]
-// mod tests {
-
-//     use super::*;
-
-//     #[test]
-//     fn plot_macro() -> anyhow::Result<()> {
-//         // let map: HashMap<String, Vec<u32>> = HashMap::new();\
-//         let df = polars::df!(
-//             "a" => [1, 2, 3],
-//             "b" => [4, 5, 6],
-//         )?;
-
-//         let plot = plot!(df);
-//         assert!(plot.data.is_some());
-//         assert_eq!(plot.aes, Some(aes::Aes::default()));
-
-//         Ok(())
-//     }
-// }

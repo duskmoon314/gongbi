@@ -58,8 +58,6 @@ macro_rules! aes {
 mod tests {
     use crate::rgb;
 
-    // use super::*;
-
     #[test]
     fn aes_macro() {
         let _ = aes!("x");
