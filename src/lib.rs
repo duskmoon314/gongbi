@@ -1,4 +1,32 @@
-// #![deny(missing_docs)]
+//! # Gongbi (工笔)
+//!
+//! ## Overview
+//!
+//! Gongbi is a data visualization crate based on [plotters](https:://crates.io/crates/plotters), and inspired by [ggplot2](https://ggplot2.tidyverse.org/).
+//!
+//! The name "Gongbi" (工笔) is a Chinese painting technique that uses highly detailed brushstrokes to create realistic images.
+//!
+//! ## Usage
+//!
+//! Like `ggplot2`, you can start with [`plot!`], supply a data source and aesthetics ([`aes!`]), and add layers ([`geom_point!`] or [`geom_line!`]) and labels ([`labs!`]).
+//!
+//! ```ignore
+//! # use gongbi::*;
+//! # use polars::prelude::*;
+//! let mpg = CsvReadOptions::default()
+//!     .with_has_header(true)
+//!     .try_into_reader_with_file_path(Some("examples/mpg.csv".into()))?
+//!     .finish()?;
+//!
+//! let plot = plot!(mpg, aes!("displ", "hwy"), save = "gongbi.svg")
+//!     + geom_point!()
+//!     + labs!(caption = "Demo of geom_point");
+//!
+//! plot.draw()?;
+//! ```
+//!
+#![doc = include_str!("../gongbi.svg")]
+//!
 
 use std::path::PathBuf;
 
@@ -14,25 +42,88 @@ pub mod geom;
 pub mod label;
 pub mod layer;
 
+/// # Plot: The main object to create a plot
+///
+/// It is recommended to use the [`plot!`] macro or [`Plot::builder`] to create a [`Plot`] object.
 #[derive(Debug, Default, typed_builder::TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 pub struct Plot {
+    /// The data source for the plot
+    ///
+    /// If not specified, the data source must be supplied in each layer.
+    ///
+    /// See [`data::Data`] for all supported data sources.
     #[builder(setter(transform = |x: impl Into<data::Data>| Some(Box::new(x.into()))))]
     pub data: Option<Box<data::Data>>,
 
+    /// The default aesthetics mapping for the plot
+    ///
+    /// If not specified, the aesthetics mapping must be supplied in each layer.
+    ///
+    /// See [`aes::Aes`] for all supported aesthetics.
     pub mapping: aes::Aes,
 
+    /// The layers of the plot
+    ///
+    /// This is the main part of the plot, layers like points, lines, and bars are added here. When [`Plot::draw`] is called, all layers are drawn on the plot.
+    ///
+    /// Usually, layers are added using the `+` operator. See [`layer::Layer`] for more information on each layer.
     pub layers: Vec<layer::Layer>,
 
+    /// The label of the plot
+    ///
+    /// This is used to add a caption, x-axis label, and y-axis label to the plot.
     pub label: label::Label,
 
-    #[builder(setter(strip_option))]
-    pub size: Option<(u32, u32)>,
+    /// The size of the plot
+    ///
+    /// This is optional and defaults to (1024, 768).
+    #[builder(default = (1024, 768))]
+    pub size: (u32, u32),
 
-    #[builder(setter(strip_option))]
-    pub save: Option<PathBuf>,
+    /// The path to save the plot
+    #[builder(default = "gongbi.png".into())]
+    pub save: PathBuf,
 }
 
+/// # plot!: A macro to create a [`Plot`] object
+///
+/// This macro is used to create a [`Plot`] object in a more concise way. Check [`Plot`] for more information on each argument.
+///
+/// ## Usage
+///
+/// ```ignore
+/// plot!(
+///     data = <Data>,
+///     mapping = aes!(...),
+///     size = (<width>, <height>),
+///     save = "path/to/file.png"
+/// )
+/// ```
+///
+/// ## Arguments
+///
+/// ### data
+///
+/// The default data source for the plot. If not specified, the data source must be supplied in each layer.
+///
+/// The `data =` part can be omitted if the data source is the first argument.
+///
+/// ### mapping
+///
+/// The default aesthetics mapping for the plot. If not specified, the aesthetics mapping must be supplied in each layer.
+///
+/// The `mapping =` part can be omitted if the data source and aesthetics mapping are the first two arguments.
+///
+/// ### size
+///
+/// The size of the plot. This is optional and defaults to (1024, 768).
+///
+/// ### save
+///
+/// The path to save the plot. This is optional and defaults to "gongbi.png".
+///
+/// Only PNG and SVG file formats are supported at the moment.
 #[macro_export]
 macro_rules! plot {
     ($($arg:ident = $val:expr),* $(,)?) => {
@@ -85,17 +176,17 @@ impl Plot {
     pub fn draw(&self) -> anyhow::Result<()> {
         use plotters::prelude::*;
 
-        let save = self.save.clone().unwrap_or("gongbi.png".into());
+        let save = self.save.clone();
         let ext = save.extension().unwrap().to_str().unwrap();
 
         match ext {
             "png" => {
-                let root = BitMapBackend::new(&save, self.size.unwrap_or((1024, 768)));
+                let root = BitMapBackend::new(&save, self.size);
 
                 self.draw_inner(root)?;
             }
             "svg" => {
-                let root = SVGBackend::new(&save, self.size.unwrap_or((1024, 768)));
+                let root = SVGBackend::new(&save, self.size);
 
                 self.draw_inner(root)?;
             }
