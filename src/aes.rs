@@ -1,5 +1,5 @@
 pub mod color;
-pub mod plaette;
+pub mod palette;
 
 #[derive(Clone, Debug, Default, PartialEq, typed_builder::TypedBuilder)]
 #[builder(field_defaults(default, setter(into, strip_option)))]
@@ -15,6 +15,9 @@ pub struct Aes {
 
     /// The color to use
     pub color: Option<color::Color>,
+
+    /// The color palette to use
+    pub palette: Option<palette::Palette>,
 
     /// Whether to fill the shape
     pub fill: Option<bool>,

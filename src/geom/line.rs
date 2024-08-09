@@ -73,15 +73,12 @@ impl Line {
             }
         };
 
-        let color = match mapping.color {
-            Some(crate::aes::color::Color::Rgba(rgba)) => {
-                RGBAColor(rgba.0, rgba.1, rgba.2, mapping.alpha.unwrap_or(rgba.3))
-            }
-            None => BLACK.mix(1.0),
-            _ => unimplemented!(),
-        };
+        let mut color = mapping.color.clone().unwrap_or_default();
+        if mapping.alpha.is_some() {
+            *color.alpha_mut() = mapping.alpha.unwrap();
+        }
 
-        let line_series = LineSeries::new(points.iter().map(|(x, y)| (*x, *y)), &color);
+        let line_series = LineSeries::new(points.iter().map(|(x, y)| (*x, *y)), &color.0);
 
         let elements = line_series.into_iter().collect();
 

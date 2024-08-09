@@ -52,13 +52,10 @@ impl Point {
             .zip(data.column_f64(y))
             .collect();
 
-        let color = match mapping.color {
-            Some(crate::aes::color::Color::Rgba(rgba)) => {
-                RGBAColor(rgba.0, rgba.1, rgba.2, mapping.alpha.unwrap_or(rgba.3))
-            }
-            None => BLACK.mix(1.0),
-            _ => unimplemented!(),
-        };
+        let mut color = mapping.color.clone().unwrap_or_default();
+        if mapping.alpha.is_some() {
+            *color.alpha_mut() = mapping.alpha.unwrap();
+        }
 
         let elements = points
             .iter()
@@ -67,9 +64,9 @@ impl Point {
                     (*x, *y),
                     mapping.size.unwrap_or(5),
                     if mapping.fill.unwrap_or(true) {
-                        color.filled()
+                        color.0.filled()
                     } else {
-                        color.stroke_width(1)
+                        color.0.stroke_width(1)
                     },
                 )
                 .into_dyn()
