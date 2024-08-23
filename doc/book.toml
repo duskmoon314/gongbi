@@ -5,5 +5,9 @@ multilingual = false
 src = "src"
 title = "The Book of Gongbi"
 
+[output.html]
+git-repository-url = "https://github.com/duskmoon314/gongbi"
+edit-url-template = "https://github.com/duskmoon314/gongbi/edit/main/doc/{path}"
+
 [output.html.playground]
 runnable = false
