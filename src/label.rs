@@ -1,16 +1,31 @@
-use core::ops::Add;
+use std::ops::Add;
 
-#[derive(Clone, Debug, Default, PartialEq, typed_builder::TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+use derive_builder::Builder;
+
+#[derive(Clone, Debug, Default, PartialEq, Builder)]
+#[builder(default, setter(into, strip_option))]
 pub struct Label {
-    /// The caption of the plot.
     pub caption: Option<String>,
 
-    /// The x-axis label of the plot.
     pub x: Option<String>,
 
-    /// The y-axis label of the plot.
     pub y: Option<String>,
+}
+
+impl Label {
+    pub fn builder() -> LabelBuilder {
+        LabelBuilder::default()
+    }
+}
+
+#[macro_export]
+macro_rules! labs {
+    ($($arg: ident = $val: expr),* $(,)?) => {
+        $crate::label::Label::builder()
+            $(.$arg($val))*
+            .build()
+            .unwrap()
+    }
 }
 
 impl Add for Label {
@@ -18,18 +33,21 @@ impl Add for Label {
 
     fn add(self, rhs: Self) -> Self::Output {
         Self {
-            caption: rhs.caption.or(self.caption),
-            x: rhs.x.or(self.x),
-            y: rhs.y.or(self.y),
+            caption: self.caption.or(rhs.caption),
+            x: self.x.or(rhs.x),
+            y: self.y.or(rhs.y),
         }
     }
 }
 
-#[macro_export]
-macro_rules! labs {
-    ($($arg:ident = $val:expr),* $(,)?) => {
-        $crate::label::Label::builder()
-            $(.$arg($val))*
-            .build()
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_label_macro() {
+        let label = labs!(caption = "Caption", x = "X", y = "Y");
+
+        assert_eq!(label.caption, Some("Caption".to_string()));
+        assert_eq!(label.x, Some("X".to_string()));
+        assert_eq!(label.y, Some("Y".to_string()));
     }
 }

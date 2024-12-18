@@ -7,18 +7,17 @@ fn main() -> anyhow::Result<()> {
         .try_into_reader_with_file_path(Some("mpg.csv".into()))?
         .finish()?;
 
-    let plot = plot!(mpg.clone(), aes!("displ", "hwy"), save = "mpg_point.svg")
+    let plot = plot!(mpg.clone(), aes!("displ", "hwy"))
         + geom_point!()
         + labs!(caption = "Demo of geom_point");
 
-    plot.draw()?;
+    plot.to_svg("mpg_point.svg", (1024, 768))?;
 
-    let plot = plot!(
-        mpg.clone(),
-        aes!("displ", "hwy", color = "blue"),
-        save = "mpg_point_color.svg"
-    ) + geom_point!();
-    plot.draw()?;
+    let plot = plot!(mpg.clone(), aes!("displ", "hwy", color = "blue"))
+        + geom_point!()
+        + labs!(caption = "Demo of geom_point with color");
+
+    plot.to_svg("mpg_point_color.svg", (1024, 768))?;
 
     Ok(())
 }

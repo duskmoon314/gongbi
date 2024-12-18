@@ -18,223 +18,102 @@
 //!     .try_into_reader_with_file_path(Some("examples/mpg.csv".into()))?
 //!     .finish()?;
 //!
-//! let plot = plot!(mpg, aes!("displ", "hwy"), save = "gongbi.svg")
+//! let plot = plot!(mpg, aes!("displ", "hwy"))
 //!     + geom_point!()
 //!     + labs!(caption = "Demo of geom_point");
 //!
-//! plot.draw()?;
+//! plot.to_svg("gongbi.svg", (1024, 768))?;
 //! ```
 //!
 #![doc = include_str!("../gongbi.svg")]
 //!
 
-use std::path::PathBuf;
+use std::{ops::Add, path::PathBuf, rc::Rc};
 
-use layer::MappedElements;
-
-/// Re-export plotters crate
-pub use plotters;
-use plotters::prelude::*;
+use derive_builder::Builder;
 
 pub mod aes;
 pub mod data;
-pub mod geom;
 pub mod label;
 pub mod layer;
 
-/// # Plot: The main object to create a plot
-///
-/// It is recommended to use the [`plot!`] macro or [`Plot::builder`] to create a [`Plot`] object.
-#[derive(Debug, Default, typed_builder::TypedBuilder)]
-#[builder(field_defaults(default, setter(into)))]
+#[derive(Builder)]
 pub struct Plot {
     /// The data source for the plot
     ///
-    /// If not specified, the data source must be supplied in each layer.
-    ///
-    /// See [`data::Data`] for all supported data sources.
-    #[builder(setter(transform = |x: impl Into<data::Data>| Some(Box::new(x.into()))))]
-    pub data: Option<Box<data::Data>>,
+    /// If not specified, the data source must be supplied in each layer
+    #[builder(default, setter(custom))]
+    data: Option<Rc<dyn data::Data>>,
 
     /// The default aesthetics mapping for the plot
     ///
-    /// If not specified, the aesthetics mapping must be supplied in each layer.
+    /// If not specified, the aesthetics mapping must be supplied in each layer
     ///
-    /// See [`aes::Aes`] for all supported aesthetics.
-    pub mapping: aes::Aes,
+    /// See [`aes::Aes`] for all supported aesthetics
+    mapping: aes::Aes,
 
     /// The layers of the plot
     ///
     /// This is the main part of the plot, layers like points, lines, and bars are added here. When [`Plot::draw`] is called, all layers are drawn on the plot.
     ///
-    /// Usually, layers are added using the `+` operator. See [`layer::Layer`] for more information on each layer.
-    pub layers: Vec<layer::Layer>,
+    /// Usually, layers are added using the `+` operator.
+    #[builder(default, setter(skip))]
+    layers: Vec<Box<dyn layer::Layer>>,
 
     /// The label of the plot
     ///
-    /// This is used to add a caption, x-axis label, and y-axis label to the plot.
-    pub label: label::Label,
-
-    /// The size of the plot
-    ///
-    /// This is optional and defaults to (1024, 768).
-    #[builder(default = (1024, 768))]
-    pub size: (u32, u32),
-
-    /// The path to save the plot
-    #[builder(default = "gongbi.png".into())]
-    pub save: PathBuf,
+    /// This is used to add titles, captions, and other labels to the plot
+    #[builder(default, setter(skip))]
+    label: label::Label,
 }
 
-/// # plot!: A macro to create a [`Plot`] object
-///
-/// This macro is used to create a [`Plot`] object in a more concise way. Check [`Plot`] for more information on each argument.
-///
-/// ## Usage
-///
-/// ```ignore
-/// plot!(
-///     data = <Data>,
-///     mapping = aes!(...),
-///     size = (<width>, <height>),
-///     save = "path/to/file.png"
-/// )
-/// ```
-///
-/// ## Arguments
-///
-/// ### data
-///
-/// The default data source for the plot. If not specified, the data source must be supplied in each layer.
-///
-/// The `data =` part can be omitted if the data source is the first argument.
-///
-/// ### mapping
-///
-/// The default aesthetics mapping for the plot. If not specified, the aesthetics mapping must be supplied in each layer.
-///
-/// The `mapping =` part can be omitted if the data source and aesthetics mapping are the first two arguments.
-///
-/// ### size
-///
-/// The size of the plot. This is optional and defaults to (1024, 768).
-///
-/// ### save
-///
-/// The path to save the plot. This is optional and defaults to "gongbi.png".
-///
-/// Only PNG and SVG file formats are supported at the moment.
-#[macro_export]
-macro_rules! plot {
-    ($($arg:ident = $val:expr),* $(,)?) => {
-        $crate::Plot::builder()
-            $(.$arg($val))*
-            .build()
-    };
-
-    ($data:expr $(, $($arg:ident = $val:expr),+ $(,)?)?) => {
-        $crate::plot!(data = $data $(, $($arg = $val),+)?)
-    };
-
-    ($data:expr, $aes:expr $(, $($arg:ident = $val:expr),+ $(,)?)?) => {
-        $crate::plot!(data = $data, mapping = $aes $(, $($arg = $val),+)?)
-    }
-}
-
-impl<L> core::ops::Add<L> for Plot
-where
-    L: Into<layer::Layer>,
-{
-    type Output = Plot;
-
-    fn add(self, rhs: L) -> Self::Output {
-        // println!("self.mapping: {:?}", self.mapping);
-
-        let mut rhs: layer::Layer = rhs.into();
-        rhs.data_mut()
-            .get_or_insert(self.data.as_ref().unwrap().clone());
-        rhs.mapping_mut().inherit(&self.mapping);
-
-        let mut layers = self.layers;
-        layers.push(rhs);
-
-        Plot { layers, ..self }
-    }
-}
-
-impl core::ops::Add<label::Label> for Plot {
-    type Output = Plot;
-
-    fn add(self, rhs: label::Label) -> Self::Output {
-        let label = self.label + rhs;
-
-        Plot { label, ..self }
+impl PlotBuilder {
+    pub fn data<D>(&mut self, data: D) -> &mut Self
+    where
+        D: data::Data + 'static,
+    {
+        self.data = Some(Some(Rc::new(data)));
+        self
     }
 }
 
 impl Plot {
-    pub fn draw(&self) -> anyhow::Result<()> {
-        use plotters::prelude::*;
-
-        let save = self.save.clone();
-        let ext = save.extension().unwrap().to_str().unwrap();
-
-        match ext {
-            "png" => {
-                let root = BitMapBackend::new(&save, self.size);
-
-                self.draw_inner(root)?;
-            }
-            "svg" => {
-                let root = SVGBackend::new(&save, self.size);
-
-                self.draw_inner(root)?;
-            }
-            _ => panic!("Unsupported file extension"),
-        }
-
-        Ok(())
+    pub fn builder() -> PlotBuilder {
+        PlotBuilder::default()
     }
 
-    fn draw_inner<DB: DrawingBackend>(&self, db: DB) -> anyhow::Result<()>
+    pub fn to_svg<P>(&self, file_path: P, size: (u32, u32)) -> anyhow::Result<()>
     where
-        <DB as plotters::prelude::DrawingBackend>::ErrorType: 'static,
+        P: Into<PathBuf>,
     {
         use plotters::prelude::*;
 
-        let root = db.into_drawing_area();
+        let file_path = file_path.into();
+
+        let root = SVGBackend::new(&file_path, size).into_drawing_area();
 
         root.fill(&WHITE)?;
 
-        let mut elements: Vec<DynElement<DB, (f64, f64)>> = Vec::new();
-        let mut x_range = (f64::INFINITY, -f64::INFINITY);
-        let mut y_range = (f64::INFINITY, -f64::INFINITY);
+        // Get the range of the x and y axis
+        let range = self
+            .layers
+            .iter()
+            .map(|layer| layer.range_2d())
+            .reduce(|acc, cur| {
+                (
+                    acc.0.min(cur.0),
+                    acc.1.max(cur.1),
+                    acc.2.min(cur.2),
+                    acc.3.max(cur.3),
+                )
+            })
+            .expect("No layers");
 
-        self.layers.iter().for_each(|layer| {
-            let MappedElements {
-                x_range: x,
-                y_range: y,
-                elements: element,
-            } = layer.mapping_data::<DB>();
+        let x_range_len = range.1 - range.0;
+        let y_range_len = range.3 - range.2;
 
-            x_range = (x_range.0.min(x.0), x_range.1.max(x.1));
-
-            y_range = (y_range.0.min(y.0), y_range.1.max(y.1));
-
-            elements.extend(element);
-        });
-
-        let x_range_len = x_range.1 - x_range.0;
-        let y_range_len = y_range.1 - y_range.0;
-
-        x_range = (
-            x_range.0 - 0.025 * x_range_len,
-            x_range.1 + 0.025 * x_range_len,
-        );
-        y_range = (
-            y_range.0 - 0.025 * y_range_len,
-            y_range.1 + 0.025 * y_range_len,
-        );
+        let x_range = (range.0 - 0.025 * x_range_len, range.1 + 0.025 * x_range_len);
+        let y_range = (range.2 - 0.025 * y_range_len, range.3 + 0.025 * y_range_len);
 
         let mut chart = ChartBuilder::on(&root);
 
@@ -243,7 +122,7 @@ impl Plot {
             .x_label_area_size(10.percent())
             .y_label_area_size(10.percent());
 
-        if let Some(caption) = self.label.caption.as_ref() {
+        if let Some(caption) = &self.label.caption {
             chart.caption(caption, ("sans-serif", 32).into_font());
         }
 
@@ -254,17 +133,17 @@ impl Plot {
             .x_label_style(("sans-serif", 16).into_font())
             .y_label_style(("sans-serif", 16).into_font());
 
-        if let Some(x_label) = self.label.x.as_ref() {
+        if let Some(x_label) = &self.label.x {
             mesh.x_desc(x_label);
-        } else if let Some(x_label) = self.mapping.x.as_ref() {
+        } else if let Some(x_label) = self.mapping.x {
             mesh.x_desc(x_label);
         } else {
             mesh.x_desc("x");
         }
 
-        if let Some(y_label) = self.label.y.as_ref() {
+        if let Some(y_label) = &self.label.y {
             mesh.y_desc(y_label);
-        } else if let Some(y_label) = self.mapping.y.as_ref() {
+        } else if let Some(y_label) = self.mapping.y {
             mesh.y_desc(y_label);
         } else {
             mesh.y_desc("y");
@@ -272,10 +151,90 @@ impl Plot {
 
         mesh.draw()?;
 
-        chart.draw_series(elements)?;
+        for layer in &self.layers {
+            layer.draw_svg_2d(&mut chart)?;
+        }
+
+        chart
+            .configure_series_labels()
+            .background_style(WHITE)
+            .label_font(("sans-serif", 16).into_font())
+            .draw()?;
 
         root.present()?;
 
         Ok(())
+    }
+}
+
+// Trick to hide internal implementation details from the docs
+macro_rules! __plot {
+    ($plot: item) => {
+        /// Construct a new [`Plot`] object
+        $plot
+    };
+}
+
+#[cfg(doc)]
+__plot![
+    #[macro_export]
+    macro_rules! plot {
+        ($($param: tt)*) => {
+            ...
+        };
+    }
+];
+
+#[cfg(not(doc))]
+__plot![
+    #[macro_export]
+    macro_rules! plot {
+        ($($param: ident = $value: expr),* $(,)?) => {
+            $crate::Plot::builder()
+                $(.$param($value))*
+                .build()
+                .unwrap()
+        };
+
+        ($data: expr $(, $($param: ident = $value: expr),+ $(,)?)?) => {
+            plot!(data = $data $(, $($param = $value),+)?)
+        };
+
+        ($data: expr, $aes: expr $(, $($param: ident = $value: expr),+ $(,)?)?) => {
+            plot!(data = $data, mapping = $aes $(, $($param = $value),+)?)
+        };
+    }
+];
+
+impl<L> Add<L> for Plot
+where
+    L: layer::Layer + 'static,
+{
+    type Output = Self;
+
+    fn add(self, rhs: L) -> Self::Output {
+        let mut rhs = rhs;
+
+        // Inherit the mapping from the plot
+        *rhs.mapping_mut() += self.mapping.clone();
+
+        // If the layer does not have data, use the plot's data
+        rhs.data_mut()
+            .get_or_insert(self.data.as_ref().expect("Plot does not have data").clone());
+
+        let mut layers = self.layers;
+        layers.push(Box::new(rhs));
+
+        Plot { layers, ..self }
+    }
+}
+
+impl Add<label::Label> for Plot {
+    type Output = Self;
+
+    fn add(self, rhs: label::Label) -> Self::Output {
+        let label = self.label + rhs;
+
+        Plot { label, ..self }
     }
 }

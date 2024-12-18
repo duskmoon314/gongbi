@@ -8,13 +8,15 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/duskmoon314/gongbi"
 
 [dependencies]
-anyhow = "1.0.86"
+anyhow = "1.0.94"
+derive_builder = "0.20.2"
 derive_more = { version = "1.0.0", features = ["from"] }
+dyn-clone = "1.0.17"
 num-traits = "0.2.19"
-plotters = "0.3.6"
-polars = { version = "0.41.3", features = ["csv"] }
-thiserror = "1.0.63"
-typed-builder = "0.19.1"
+plotters = "0.3.7"
+polars = { version = "0.45.1", features = ["csv", "partition_by"] }
+# thiserror = "1.0.63"
+typed-builder = "0.20.0"
 
-[dev-dependencies]
-trybuild = "1.0.99"
+# [dev-dependencies]
+# trybuild = "1.0.99"

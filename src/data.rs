@@ -1,45 +1,15 @@
 use std::fmt::Debug;
 
+use dyn_clone::DynClone;
+
 pub mod polars;
 
-#[derive(Clone, Debug, PartialEq, derive_more::From)]
-pub enum Data {
-    Polars(::polars::frame::DataFrame),
+pub trait Data: Debug + DynClone {
+    fn column_f64(&self, column_name: &str) -> Vec<f64>;
+
+    fn column_range_f64(&self, column_name: &str) -> (f64, f64);
+
+    fn column_len(&self, column_name: &str) -> usize;
 }
 
-impl Data {
-    pub fn column_f64(&self, column: &str) -> Vec<f64> {
-        match self {
-            Data::Polars(df) => DataMethod::column_f64(df, column),
-        }
-    }
-
-    pub fn column_range_f64(&self, column: &str) -> (f64, f64) {
-        match self {
-            Data::Polars(df) => DataMethod::column_range_f64(df, column),
-        }
-    }
-
-    pub fn column_len(&self, column: &str) -> usize {
-        match self {
-            Data::Polars(df) => DataMethod::column_len(df, column),
-        }
-    }
-}
-
-pub trait DataMethod {
-    /// Get a column as a Vec of f64
-    ///
-    /// This is used to get the coordinates of the data points
-    fn column_f64(&self, column: &str) -> Vec<f64>;
-
-    /// Get the range of a column as a tuple of f64
-    ///
-    /// This is used to set the range of the axis
-    fn column_range_f64(&self, column: &str) -> (f64, f64);
-
-    /// Get the length of a column
-    ///
-    /// This is used to get the number of data points
-    fn column_len(&self, column: &str) -> usize;
-}
+dyn_clone::clone_trait_object!(Data);

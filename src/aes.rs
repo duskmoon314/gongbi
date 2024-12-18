@@ -1,72 +1,166 @@
+use std::ops::{Add, AddAssign};
+
+use derive_builder::Builder;
+
 pub mod color;
-pub mod palette;
 
-#[derive(Clone, Debug, Default, PartialEq, typed_builder::TypedBuilder)]
-#[builder(field_defaults(default, setter(into, strip_option)))]
+#[derive(Clone, Debug, Default, PartialEq, Builder)]
+#[builder(default, setter(into, strip_option))]
 pub struct Aes {
-    /// Which column is used for the x-axis
-    pub x: Option<String>,
+    pub x: Option<&'static str>,
 
-    /// Which column is used for the y-axis
-    pub y: Option<String>,
+    pub y: Option<&'static str>,
 
-    /// The alpha value for the color
-    pub alpha: Option<f64>,
-
-    /// The color to use
     pub color: Option<color::Color>,
 
-    /// The color palette to use
-    pub palette: Option<palette::Palette>,
-
-    /// Whether to fill the shape
     pub fill: Option<bool>,
 
-    /// The size of the shape
     pub size: Option<i32>,
+
+    pub label: Option<String>,
 }
 
 impl Aes {
-    pub fn inherit(&mut self, parent_aes: &Aes) {
-        self.x = self.x.clone().or(parent_aes.x.clone());
-        self.y = self.y.clone().or(parent_aes.y.clone());
-        self.alpha = self.alpha.or(parent_aes.alpha);
-        self.color = self.color.clone().or(parent_aes.color.clone());
-        self.fill = self.fill.or(parent_aes.fill);
-        self.size = self.size.or(parent_aes.size);
+    pub fn builder() -> AesBuilder {
+        AesBuilder::default()
     }
 }
 
-#[macro_export]
-macro_rules! aes {
-    // The main implementation
-    ($($arg:ident = $val:expr),* $(,)?) => {
-        $crate::aes::Aes::builder()
-            $(.$arg($val))*
-            .build()
-    };
+impl AddAssign for Aes {
+    fn add_assign(&mut self, rhs: Self) {
+        self.x = self.x.or(rhs.x);
+        self.y = self.y.or(rhs.y);
+        self.color = self.color.clone().or(rhs.color);
+        self.fill = self.fill.or(rhs.fill);
+        self.size = self.size.or(rhs.size);
+        self.label = self.label.clone().or(rhs.label);
+    }
+}
 
-    // Extend the macro to accept x without named
-    ($x: expr $(, $($arg:ident = $val:expr),* $(,)?)?) => {
-        $crate::aes!(x = $x $(, $($arg = $val),+)?)
-    };
+impl Add for Aes {
+    type Output = Self;
 
-    // Extend the macro to accept x and y without named
-    ($x: expr, $y: expr $(, $($arg:ident = $val:expr),* $(,)?)?) => {
-        $crate::aes!(x = $x, y = $y $(, $($arg = $val),+)?)
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut res = self.clone();
+        res += rhs;
+        res
+    }
+}
+
+impl AesBuilder {
+    pub fn colour<T: Into<color::Color>>(&mut self, colour: T) -> &mut Self {
+        self.color(colour)
+    }
+
+    pub fn col<T: Into<color::Color>>(&mut self, col: T) -> &mut Self {
+        self.color(col)
+    }
+}
+
+// Trick to hide internal implementation details from the docs
+macro_rules! __aes {
+    ($aes: item) => {
+        /// Construct Aesthetic Mappings
+        $aes
     };
 }
 
+#[cfg(doc)]
+__aes![
+    #[macro_export]
+    macro_rules! aes {
+        ($($param: tt)*) => {
+            ...
+        };
+    }
+];
+
+#[cfg(not(doc))]
+__aes![
+    #[macro_export]
+    macro_rules! aes {
+        // The terminal case, call builder's build method
+        (@impl $aes: expr,) => {{
+            $aes.build().unwrap()
+        }};
+
+        // ===== Handle different aesthetics =====
+        (@impl $aes: expr, $key: ident = $value: ident $(, $($rest: tt)*)?) => {{
+            $aes.$key(stringify!($value));
+            aes!(@impl $aes, $($($rest)*)?)
+        }};
+
+        (@impl $aes: expr, $key: ident = $value: expr $(, $($rest: tt)*)?) => {{
+            $aes.$key($value);
+            aes!(@impl $aes, $($($rest)*)?)
+        }};
+
+        // ===== Extend the Main Macro =====
+
+        // Extend the macro to accept x and y without named
+        ($x: ident, $y: ident $(, $($param: tt)*)?) => {
+            aes!(x = $x, y = $y $(, $($param)+)?)
+        };
+
+        ($x: literal, $y: literal $(, $($param: tt)*)?) => {
+            aes!(x = $x, y = $y $(, $($param)+)?)
+        };
+
+        // Extend the macro to accept x without named
+        ($x: ident $(, $($param: tt)*)?) => {
+            aes!(x = $x $(, $($param)+)?)
+        };
+
+        ($x: literal $(, $($param: tt)*)?) => {
+            aes!(x = $x $(, $($param)+)?)
+        };
+
+        // ===== The Main Macro Entry =====
+
+        ($($param: tt)*) => {{
+            let mut aes = $crate::aes::Aes::builder();
+            let aes = aes!(@impl &mut aes, $($param)*);
+            aes
+        }};
+    }
+];
+
 #[cfg(test)]
 mod tests {
-    use crate::rgb;
+    use super::*;
+
+    #[test]
+    fn aes_builder() {
+        let mut aes = Aes::builder();
+        aes.x("mpg");
+        let aes = aes.build().unwrap();
+        assert_eq!(
+            aes,
+            Aes {
+                x: Some("mpg"),
+                ..Default::default()
+            }
+        );
+    }
 
     #[test]
     fn aes_macro() {
-        let _ = aes!("x");
-        let _ = aes!("x", "y");
-        let _ = aes!("x", y = "y");
-        let _ = aes!(x = "x", y = "y");
-        let _ = aes!("x", color = rgb!(255, 0, 0));
+        let aes = aes!(x = mpg);
+        assert_eq!(
+            aes,
+            Aes {
+                x: Some("mpg"),
+                ..Default::default()
+            }
+        );
+
+        let aes = aes!(mpg);
+        assert_eq!(
+            aes,
+            Aes {
+                x: Some("mpg"),
+                ..Default::default()
+            }
+        );
     }
 }
