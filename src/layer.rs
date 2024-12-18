@@ -16,9 +16,9 @@ pub trait Layer: DynClone {
 
     fn range_2d(&self) -> (f64, f64, f64, f64);
 
-    fn draw_svg_2d(
-        &self,
-        chart: &mut ChartContext<'_, SVGBackend<'_>, Cartesian2d<RangedCoordf64, RangedCoordf64>>,
+    fn draw_svg_2d<'a>(
+        &'a self,
+        chart: &mut ChartContext<'a, SVGBackend<'a>, Cartesian2d<RangedCoordf64, RangedCoordf64>>,
     ) -> anyhow::Result<()>;
 }
 

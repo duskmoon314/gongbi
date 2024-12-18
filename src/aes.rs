@@ -17,6 +17,8 @@ pub struct Aes {
 
     pub size: Option<i32>,
 
+    pub shape: Option<u8>,
+
     pub label: Option<String>,
 }
 
@@ -33,6 +35,7 @@ impl AddAssign for Aes {
         self.color = self.color.clone().or(rhs.color);
         self.fill = self.fill.or(rhs.fill);
         self.size = self.size.or(rhs.size);
+        self.shape = self.shape.or(rhs.shape);
         self.label = self.label.clone().or(rhs.label);
     }
 }

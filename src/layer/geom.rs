@@ -66,11 +66,11 @@ impl Layer for Geom {
         }
     }
 
-    fn draw_svg_2d(
-        &self,
+    fn draw_svg_2d<'a>(
+        &'a self,
         chart: &mut plotters::prelude::ChartContext<
-            '_,
-            plotters::prelude::SVGBackend<'_>,
+            'a,
+            plotters::prelude::SVGBackend<'a>,
             plotters::prelude::Cartesian2d<
                 plotters::coord::types::RangedCoordf64,
                 plotters::coord::types::RangedCoordf64,
@@ -84,33 +84,7 @@ impl Layer for Geom {
 
         match self.kind {
             GeomKind::Point => {
-                let x = mapping.x.expect("x is not set");
-                let y = mapping.y.expect("y is not set");
-
-                let points: Vec<(f64, f64)> = data
-                    .column_f64(x)
-                    .into_iter()
-                    .zip(data.column_f64(y))
-                    .collect();
-
-                let color = mapping.color.clone().unwrap_or_default().as_rgb();
-
-                let style = match mapping.fill {
-                    Some(false) => color.stroke_width(1),
-                    _ => color.filled(),
-                };
-
-                let anno = chart.draw_series(PointSeries::of_element(
-                    points,
-                    mapping.size.unwrap_or(5),
-                    style,
-                    &|c, s, st| EmptyElement::at(c) + Circle::new((0, 0), s, st),
-                ))?;
-
-                if let Some(label) = &mapping.label {
-                    anno.label(label)
-                        .legend(move |(x, y)| Circle::new((x, y), 5, color));
-                }
+                self.draw_point_2d(chart)?;
             }
 
             GeomKind::Line => {
