@@ -50,6 +50,7 @@ pub struct Plot {
     /// If not specified, the aesthetics mapping must be supplied in each layer
     ///
     /// See [`aes::Aes`] for all supported aesthetics
+    #[builder(default)]
     mapping: aes::Aes,
 
     /// The layers of the plot
