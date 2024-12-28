@@ -1,3 +1,10 @@
+//! Color module
+//!
+//! This module contains predefined colors and utilities to work with colors.
+
+// TODO: remove this when color is fully implemented
+#![allow(missing_docs)]
+
 use std::str::FromStr;
 
 use plotters::style::RGBColor;

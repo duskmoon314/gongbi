@@ -1,3 +1,5 @@
+//! `Data` implementation for `polars` DataFrame
+
 use polars::prelude::*;
 
 impl super::Data for DataFrame {

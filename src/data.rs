@@ -1,15 +1,21 @@
-use std::fmt::Debug;
+//! Data module
+//!
+//! This module defines the `Data` trait and its implementations.
 
-use dyn_clone::DynClone;
+use std::fmt::Debug;
 
 pub mod polars;
 
-pub trait Data: Debug + DynClone {
+/// # Data trait
+///
+/// This trait abstracts the data source for the [`Plot`](crate::Plot) struct.
+pub trait Data: Debug {
+    /// Get a column as a vector of f64 values.
     fn column_f64(&self, column_name: &str) -> Vec<f64>;
 
+    /// Get the minimum and maximum values of a column.
     fn column_range_f64(&self, column_name: &str) -> (f64, f64);
 
+    /// Get the length of a column.
     fn column_len(&self, column_name: &str) -> usize;
 }
-
-dyn_clone::clone_trait_object!(Data);

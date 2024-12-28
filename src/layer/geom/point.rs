@@ -1,3 +1,31 @@
+//! # Point geom layer
+//!
+//! The point geom is used to create scatter plot. The scatter plot is used to
+//! visualize the relationship between two continuous variables.
+//!
+//! ## Example
+//!
+//! ```no_run
+//! # use gongbi::*;
+//! # use polars::prelude::*;
+//! # fn main() -> anyhow::Result<()> {
+//! # let mpg = CsvReadOptions::default()
+//! #     .with_has_header(true)
+//! #     .try_into_reader_with_file_path(Some("examples/mpg.csv".into()))?
+//! #     .finish()?;
+//! let p = plot!(mpg, aes!(displ, hwy))
+//!     + geom_point!();
+//!
+//! p.to_svg("geom_point.svg", (800, 600))?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! See [`geom_point!`](crate::geom_point!) or [`Point::builder`] for more details.
+
+use std::rc::Rc;
+
+use derive_builder::Builder;
 use plotters::{
     chart::ChartContext,
     coord::types::RangedCoordf64,
@@ -9,21 +37,33 @@ use plotters::{
     style::Color,
 };
 
-use super::Geom;
+use crate::layer::Layer;
 
-#[macro_export]
-macro_rules! geom_point {
-    ($aes:expr $(, $($param: tt)*)?) => {
-        $crate::geom!(Point, mapping = $aes $(, $($param)*)?)
-    };
+use super::range_2d_x_xy;
 
-    ($($param: tt)*) => {
-        $crate::geom!(Point, $($param)*)
-    };
+/// # Point layer
+///
+/// The point geom layer is used to draw scatter plot.
+///
+/// To create a point layer, [`geom_point!`](crate::geom_point!) and [`Point::builder`] can be used.
+#[derive(Clone, Debug, Default, Builder)]
+pub struct Point {
+    /// The data source for the layer.
+    #[builder(default, setter(strip_option))]
+    data: Option<Rc<dyn crate::data::Data>>,
+
+    /// The aes mapping for the layer.
+    #[builder(default)]
+    mapping: crate::aes::Aes,
 }
 
-impl Geom {
-    pub fn draw_point_2d<'a, DB>(
+impl Point {
+    /// Create a new [`Point`] via the builder pattern.
+    pub fn builder() -> PointBuilder {
+        PointBuilder::default()
+    }
+
+    fn draw_2d<'a, DB>(
         &'a self,
         chart: &mut ChartContext<'a, DB, Cartesian2d<RangedCoordf64, RangedCoordf64>>,
     ) -> anyhow::Result<()>
@@ -78,7 +118,6 @@ impl Geom {
         ))?;
 
         if let Some(label) = &mapping.label {
-            anno.label(label);
             anno.label(label).legend(move |(x, y)| match mapping.shape {
                 Some(0) => Rectangle::new([(x - 5, y - 5), (x + 5, y + 5)], color).into_dyn(),
                 None | Some(1) => Circle::new((x, y), 5, color).into_dyn(),
@@ -89,5 +128,84 @@ impl Geom {
         }
 
         Ok(())
+    }
+}
+
+/// # geom_point!: Construct a [`Point`] layer
+///
+/// This macro is used to create a [`Point`] layer in a more concise way like `ggplot2`.
+/// It is a wrapper around [`Point::builder`].
+///
+/// ## Usage
+///
+/// ```ignore
+/// geom_point!(
+///     mapping = aes!(...),
+///     data = <Data>
+/// )
+/// ```
+///
+/// ### Arguments
+///
+/// #### mapping
+///
+/// Set of aesthetic mappings created by [`aes!`](crate::aes!) or [`Aes::builder`](crate::aes::Aes::builder).
+///
+/// #### data
+///
+/// The data to be displayed in this layer.
+///
+/// If not provided, it will be inherited from the [`Plot`](crate::Plot).
+///
+/// If provided, it will override the data from the [`Plot`](crate::Plot).
+#[macro_export]
+macro_rules! geom_point {
+    ($($param: ident = $value: expr),* $(,)?) => {
+        $crate::layer::geom::point::Point::builder()
+            $(.$param($value))*
+            .build()
+            .unwrap()
+    };
+
+    ($mapping: expr $(, $($param: ident = $value: expr),+ $(,)?)?) => {
+        geom_point!(mapping = $mapping $(, $($param = $value),+)?)
+    };
+}
+
+impl Layer for Point {
+    fn data_mut(&mut self) -> &mut Option<Rc<dyn crate::data::Data>> {
+        &mut self.data
+    }
+
+    fn mapping_mut(&mut self) -> &mut crate::aes::Aes {
+        &mut self.mapping
+    }
+
+    fn range_2d(&self) -> (f64, f64, f64, f64) {
+        let data = self.data.as_ref().expect("data is not provided");
+
+        range_2d_x_xy(data, &self.mapping)
+    }
+
+    fn draw_svg_2d<'a>(
+        &'a self,
+        chart: &mut ChartContext<
+            'a,
+            plotters::prelude::SVGBackend<'a>,
+            Cartesian2d<RangedCoordf64, RangedCoordf64>,
+        >,
+    ) -> anyhow::Result<()> {
+        self.draw_2d(chart)
+    }
+
+    fn draw_png_2d<'a>(
+        &'a self,
+        chart: &mut ChartContext<
+            'a,
+            plotters::prelude::BitMapBackend<'a>,
+            Cartesian2d<RangedCoordf64, RangedCoordf64>,
+        >,
+    ) -> anyhow::Result<()> {
+        self.draw_2d(chart)
     }
 }

@@ -1,28 +1,45 @@
+//! Aesthetic mappings
+
 use std::ops::{Add, AddAssign};
 
 use derive_builder::Builder;
 
 pub mod color;
 
+/// Aesthetic mappings
+///
+/// Aesthetic mappings describe how variables in the data are mapped to visual
+/// properties (aesthetics) of geoms. Aesthetic mappings are constructed with
+/// the [`aes!`](crate::aes!) marco or [`Aes::builder`] method.
+///
+/// TODO: some aesthetics are not used as "mapping" but as "constant" values.
 #[derive(Clone, Debug, Default, PartialEq, Builder)]
 #[builder(default, setter(into, strip_option))]
 pub struct Aes {
+    /// The column name to map to the x-axis
     pub x: Option<&'static str>,
 
+    /// The column name to map to the y-axis
     pub y: Option<&'static str>,
 
+    /// The color aesthetic
     pub color: Option<color::Color>,
 
+    /// The fill aesthetic
     pub fill: Option<bool>,
 
+    /// The size aesthetic
     pub size: Option<i32>,
 
+    /// The shape aesthetic
     pub shape: Option<u8>,
 
+    /// The label aesthetic
     pub label: Option<String>,
 }
 
 impl Aes {
+    /// Create a new [`Aes`] object via the builder pattern
     pub fn builder() -> AesBuilder {
         AesBuilder::default()
     }
@@ -51,10 +68,12 @@ impl Add for Aes {
 }
 
 impl AesBuilder {
+    /// Set the color aesthetic, alias for [`AesBuilder::color`]
     pub fn colour<T: Into<color::Color>>(&mut self, colour: T) -> &mut Self {
         self.color(colour)
     }
 
+    /// Set the color aesthetic, alias for [`AesBuilder::color`]
     pub fn col<T: Into<color::Color>>(&mut self, col: T) -> &mut Self {
         self.color(col)
     }
@@ -63,7 +82,47 @@ impl AesBuilder {
 // Trick to hide internal implementation details from the docs
 macro_rules! __aes {
     ($aes: item) => {
-        /// Construct Aesthetic Mappings
+        /// # aes!: Construct Aesthetic Mappings
+        ///
+        /// This macro is used to create an [`Aes`] object in a more concise way
+        /// like `ggplot2`. It is a wrapper around [`Aes::builder`].
+        ///
+        /// ## Usage
+        ///
+        /// ```ignore
+        /// aes!(
+        ///     x = <X_COLUMN>,
+        ///     y = <Y_COLUMN>,
+        ///     ...
+        /// )
+        /// ```
+        ///
+        /// ### Arguments
+        ///
+        /// #### `x` and `y`
+        ///
+        /// The column names to map to the x-axis and y-axis, respectively.
+        ///
+        /// If they are the first two arguments, they can be passed without the
+        /// named argument.
+        ///
+        /// ```
+        /// # use gongbi::*;
+        /// let a1 = aes!(x);
+        /// let a2 = aes!(x, y);
+        ///
+        /// assert_eq!(a1.x, Some("x"));
+        /// assert_eq!(a2.x, Some("x"));
+        /// assert_eq!(a2.y, Some("y"));
+        /// ```
+        ///
+        /// #### Other Aesthetics
+        ///
+        /// Other aesthetics can be set with the named argument.
+        ///
+        /// - `color`
+        /// - `size`
+        /// - `shape`
         $aes
     };
 }
